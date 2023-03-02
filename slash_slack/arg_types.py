@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections import UserString
 from typing import Any, Optional, Set
 
 from pydantic import BaseModel
@@ -42,9 +43,10 @@ class Int(BaseArgType, BaseModel):
         return parsed_value
 
 
-class String(BaseArgType, BaseModel):
+class String(BaseArgType, BaseModel, UserString):
     minimum_length: Optional[int] = None
     maximum_length: Optional[int] = None
+
     # regex: Optional[str] = None
 
     def parse(self, value):

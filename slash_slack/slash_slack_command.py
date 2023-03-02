@@ -1,9 +1,9 @@
 import logging
-from typing import Any, Callable, List, Literal, Set, Union
+from typing import Any, Callable, List, Literal, Set, Tuple, Union
 
 import aiohttp
 
-from slash_slack.arg_types import BaseArgType, UnknownLengthList
+from slash_slack.arg_types import BaseArgType, String, UnknownLengthList
 from slash_slack.blocks import _make_block_message
 from slash_slack.flag import Flag
 from slash_slack.slash_slack_request import SlackSlashRequest
@@ -12,15 +12,15 @@ from slash_slack.slash_slack_request import SlackSlashRequest
 class SlashSlackCommand:
     command: str
     func: Callable
-    flags: List[Flag]
-    args_type: Union[BaseArgType, List[BaseArgType], UnknownLengthList]
+    flags: List[Tuple[str, Flag, int]]
+    args_type: List[Tuple[str, BaseArgType, int]]
 
     def __init__(
         self,
         command: str,
         func: Callable,
-        flags: List[Flag],
-        args_type: Union[BaseArgType, List[BaseArgType], UnknownLengthList],
+        flags: List[Tuple[str, Flag, int]],
+        args_type: List[Tuple[str, BaseArgType, int]],
     ):
         self.command = command
         self.func = func
@@ -28,33 +28,42 @@ class SlashSlackCommand:
         self.args_type = args_type
 
     def parse_args(self, args: str):
-        if isinstance(self.args_type, list):
-            split_args = [arg for arg in args.split(" ") if arg != ""]
-            if len(self.args_type) != len(split_args):
+        if len(self.args_type) == 1 and isinstance(self.args_type[0][1], String):
+            print("should be here")
+            p = self.args_type[0][1].parse(args)
+            if p is None:
                 return None
-            l = [
-                arg_type.parse(arg) for arg, arg_type in zip(split_args, self.args_type)
-            ]
-            if None in l:
-                return None
-            return l
-        if isinstance(self.args_type, UnknownLengthList):
-            split_args = [arg for arg in args.split(" ") if arg != ""]
-            return self.args_type.parse(split_args)
+            return [p]
 
-        if isinstance(self.args_type, BaseArgType):
-            return self.args_type.parse(args)
+        split_args = [arg for arg in args.split(" ") if arg != ""]
+        if len(self.args_type) == 1 and isinstance(
+            self.args_type[0][1], UnknownLengthList
+        ):
+            return self.args_type[0][1].parse(split_args)
 
-        return None
+        if len(split_args) != len(self.args_type):
+            return None
+        l = [
+            self.args_type[index][1].parse(arg) for index, arg in enumerate(split_args)
+        ]
+        if None in l:
+            return None
+        return l
 
     async def execute(
         self,
-        args: Union[str, List[str]],
+        args: List[str],
         flags: Set[str],
         global_flags: Set[str],
         slack_slash_request: SlackSlashRequest,
     ):
-        response = self.func(*[args, flags][: self.func.__code__.co_argcount])
+        f_args: List[Any] = [None for _ in range(self.func.__code__.co_argcount)]
+        for i, value in enumerate(args):
+            f_args[self.args_type[i][2]] = value
+        for name, f, i in self.flags:
+            f_args[i] = name in flags
+
+        response = self.func(*f_args)
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 slack_slash_request.response_url,

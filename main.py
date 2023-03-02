@@ -8,21 +8,30 @@ slash = SlashSlack(dev=True)
 app = slash.get_fastapi()
 
 
-@slash.command(
-    "test", flags=[Flag(value="upper"), Flag(value="lower")], args_type=String()
-)
-def test_fn(args: str, flags: Set[str]):
-    if "upper" in flags:
-        return args.upper()
-    if "lower" in flags:
-        return args.lower()
+@slash.command("test")
+def test_fn(text=String(minimum_length=10), upper=Flag(), lower=Flag()):
+    if upper:
+        return text.upper()
+    if lower:
+        return text.lower()
 
-    return args
+    return text
 
 
-@slash.command("math", args_type=[Float(), Enum(values={"*", "+", "-", "/"}), Float()])
-def math_fn(args: list):
-    x, m, y = args
+# @slash.command(
+#     "test", flags=[Flag(value="upper"), Flag(value="lower")], args_type=String()
+# )
+# def test_fn(args: str, flags: Set[str]):
+#     if "upper" in flags:
+#         return args.upper()
+#     if "lower" in flags:
+#         return args.lower()
+
+#     return args
+
+
+@slash.command("math")
+def math_fn(x=Float(), m=Enum(values={"*", "+", "-", "/"}), y=Float()):
     if m == "*":
         return x * y
     if m == "+":
