@@ -1,15 +1,21 @@
-from typing import Set
+from typing import List
 
-from slash_slack import SlashSlack
-from slash_slack.arg_types import Enum, Float, String
-from slash_slack.flag import Flag
+from slash_slack import (
+    Enum,
+    Flag,
+    Float,
+    SlashSlack,
+    SlashSlackRequest,
+    String,
+    UnknownLengthList,
+)
 
 slash = SlashSlack(dev=True)
 app = slash.get_fastapi()
 
 
 @slash.command("test")
-def test_fn(text=String(minimum_length=10), upper=Flag(), lower=Flag()):
+def test_fn(text: str = String(minimum_length=10), upper: bool = Flag(), lower=Flag()):
     if upper:
         return text.upper()
     if lower:
@@ -18,20 +24,10 @@ def test_fn(text=String(minimum_length=10), upper=Flag(), lower=Flag()):
     return text
 
 
-# @slash.command(
-#     "test", flags=[Flag(value="upper"), Flag(value="lower")], args_type=String()
-# )
-# def test_fn(args: str, flags: Set[str]):
-#     if "upper" in flags:
-#         return args.upper()
-#     if "lower" in flags:
-#         return args.lower()
-
-#     return args
-
-
 @slash.command("math")
-def math_fn(x=Float(), m=Enum(values={"*", "+", "-", "/"}), y=Float()):
+def math_fn(
+    x: float = Float(), m: str = Enum(values={"*", "+", "-", "/"}), y: float = Float()
+):
     if m == "*":
         return x * y
     if m == "+":
@@ -40,3 +36,12 @@ def math_fn(x=Float(), m=Enum(values={"*", "+", "-", "/"}), y=Float()):
         return x - y
     if m == "/":
         return x / y
+
+
+@slash.command("u")
+def unknown(
+    slash_slack_request: SlashSlackRequest,
+    t: str,
+    l: List[str] = UnknownLengthList(arg_type=String()),
+):
+    return "_+_".join(str(s) for s in l) + " " + t + " " + slash_slack_request.user_name

@@ -1,19 +1,29 @@
 from abc import ABC, abstractmethod
-from collections import UserString
 from typing import Any, Optional, Set
-
-from pydantic import BaseModel
 
 
 class BaseArgType(ABC):
+    help: Optional[str] = None
+
     @abstractmethod
     def parse(self, value) -> Any:
         pass
 
 
-class Float(BaseArgType, BaseModel):
+class FloatType(BaseArgType):
+    help: Optional[str] = None
     minimum: Optional[float] = None
     maximum: Optional[float] = None
+
+    def __init__(
+        self,
+        help: Optional[str] = None,
+        minimum: Optional[float] = None,
+        maximum: Optional[float] = None,
+    ):
+        self.help = help
+        self.minimum = minimum
+        self.maximum = maximum
 
     def parse(self, value):
         try:
@@ -27,9 +37,20 @@ class Float(BaseArgType, BaseModel):
         return parsed_value
 
 
-class Int(BaseArgType, BaseModel):
+class IntType(BaseArgType):
+    help: Optional[str] = None
     minimum: Optional[int] = None
     maximum: Optional[int] = None
+
+    def __init__(
+        self,
+        help: Optional[str] = None,
+        minimum: Optional[int] = None,
+        maximum: Optional[int] = None,
+    ):
+        self.help = help
+        self.minimum = minimum
+        self.maximum = maximum
 
     def parse(self, value):
         try:
@@ -43,11 +64,22 @@ class Int(BaseArgType, BaseModel):
         return parsed_value
 
 
-class String(BaseArgType, BaseModel, UserString):
+class StringType(BaseArgType):
+    help: Optional[str] = None
     minimum_length: Optional[int] = None
     maximum_length: Optional[int] = None
 
     # regex: Optional[str] = None
+
+    def __init__(
+        self,
+        help: Optional[str] = None,
+        minimum_length: Optional[int] = None,
+        maximum_length: Optional[int] = None,
+    ):
+        self.help = help
+        self.minimum_length = minimum_length
+        self.maximum_length = maximum_length
 
     def parse(self, value):
         try:
@@ -63,8 +95,17 @@ class String(BaseArgType, BaseModel, UserString):
         return parsed_value
 
 
-class Enum(BaseArgType, BaseModel):
+class EnumType(BaseArgType):
+    help: Optional[str] = None
     values: Set[str]
+
+    def __init__(
+        self,
+        values: Set[str],
+        help: Optional[str] = None,
+    ):
+        self.help = help
+        self.values = values
 
     def parse(self, value):
         value = str(value)
@@ -73,14 +114,25 @@ class Enum(BaseArgType, BaseModel):
         return value
 
 
-class UnknownLengthList:
-    def __init__(self, type: BaseArgType):
-        self.type = type
+class UnknownLengthListType(BaseArgType):
+    help: Optional[str] = None
+    arg_type: BaseArgType
+
+    def __init__(self, arg_type: BaseArgType, help: Optional[str] = None):
+        self.arg_type = arg_type
+        self.help = help
 
     def parse(self, value):
         l = []
         for arg in value:
-            l.append(self.type.parse(arg))
+            l.append(self.arg_type.parse(arg))
         if None in l:
             return None
         return l
+
+
+class FlagType:
+    help: Optional[str] = None
+
+    def __init__(self, help: Optional[str] = None):
+        self.help = help

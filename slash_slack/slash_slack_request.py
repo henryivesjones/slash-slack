@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 
-class SlackSlashRequest(BaseModel):
+class SlashSlackRequest(BaseModel):
     token: str
     team_id: str
     team_domain: str
