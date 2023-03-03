@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 import argparse
+import asyncio
 import json
 import urllib.parse
 import webbrowser
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-import requests
+import aiohttp
 
 _CALLBACK_SERVER_PORT = 9863
 _BASE_PARAMS = {
@@ -41,20 +42,12 @@ class CallbackHandler(BaseHTTPRequestHandler):
         _open_slack_block_builder(data=json.loads(post_data.decode()))
         self._set_response()
 
-        th.submit(_shutdown_server)
-
     def log_request(self, _) -> None:
         return
 
 
-tasks = []
-th = ThreadPoolExecutor()
-server = HTTPServer(("localhost", _CALLBACK_SERVER_PORT), CallbackHandler)
-
-
 def _parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(dest="text", help="The text in the message.")
     parser.add_argument(
         "--port",
         default=9002,
@@ -68,7 +61,7 @@ def _parse_args():
     )
 
     args = parser.parse_args()
-    return args.text, args.port, args.path
+    return args.port, args.path
 
 
 _CALLBACK_SERVER_PORT = 9863
@@ -94,43 +87,48 @@ _BASE_URL = "https://app.slack.com/block-kit-builder/#"
 
 def _open_slack_block_builder(data: dict):
     if "response_type" in data:
-        print(f"Response visibility is {data['response_type']}")
         del data["response_type"]
-    webbrowser.open_new_tab(f"{_BASE_URL}{urllib.parse.quote(json.dumps(data))}")
+    webbrowser.open(f"{_BASE_URL}{urllib.parse.quote(json.dumps(data))}", new=0)
 
 
-def _run_callback_server():
+def _run_callback_server(server: HTTPServer):
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
 
 
-def _send_message(port: int, path: str, data: dict):
-    response = requests.post(f"http://localhost:{port}{path}", data=data)
-    if response.status_code != 200:
-        print("Receipt failed...")
-        _shutdown_server()
-        return
-    if len(response.content) > 0:
-        receipt_content = response.json()
-        _open_slack_block_builder(receipt_content)
-        _shutdown_server()
+async def _send_message(port: int, path: str, data: dict):
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"http://localhost:{port}{path}",
+            data=data,
+        ) as resp:
+            if resp.status != 200:
+                print("Receipt failed...")
+                return
+            if resp.content_length == 0:
+                return
+            receipt_content = await resp.json()
+            _open_slack_block_builder(receipt_content)
 
 
-def _shutdown_server():
-    server.shutdown()
+def main():
+    with ThreadPoolExecutor() as th:
+        port, path = _parse_args()
+        tasks = []
+        server = HTTPServer(("localhost", _CALLBACK_SERVER_PORT), CallbackHandler)
+        tasks.append(th.submit(_run_callback_server, server))
+
+        t_params = {**_BASE_PARAMS}
+        try:
+            while True:
+                msg = input("MSG: ")
+                t_params["text"] = msg
+                asyncio.run(_send_message(port, path, t_params))
+        except KeyboardInterrupt:
+            pass
 
 
-text, port, path = _parse_args()
-
-t_params = {**_BASE_PARAMS}
-t_params["text"] = text
-
-
-tasks.append(th.submit(_run_callback_server))
-tasks.append(th.submit(_send_message, port, path, t_params))
-
-wait(tasks)
-
-th.shutdown()
+if __name__ == "__main__":
+    main()

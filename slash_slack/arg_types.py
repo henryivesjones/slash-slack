@@ -10,7 +10,7 @@ class BaseArgType(ABC):
         pass
 
     @abstractmethod
-    def help_repr(self, name: str) -> str:
+    def help_repr(self) -> str:
         pass
 
     @abstractmethod
@@ -44,15 +44,15 @@ class FloatType(BaseArgType):
             return None
         return parsed_value
 
-    def help_repr(self, name: str) -> str:
+    def help_repr(self) -> str:
         qualifiers = ""
         if self.minimum is not None and self.maximum is not None:
-            qualifiers = f" ({self.maximum} > {name} > {self.minimum})"
+            qualifiers = f" ({self.maximum} > cal > {self.minimum})"
         elif self.minimum is not None:
-            qualifiers = f" ({name} > {self.minimum})"
+            qualifiers = f" (val > {self.minimum})"
         elif self.minimum is not None:
-            qualifiers = f" ({self.maximum} > {name})"
-        return f"<{name}:float{qualifiers}>"
+            qualifiers = f" ({self.maximum} > val)"
+        return f"float{qualifiers}"
 
     def global_help_repr(self, name: str) -> str:
         return f"{name}:float"
@@ -84,15 +84,15 @@ class IntType(BaseArgType):
             return None
         return parsed_value
 
-    def help_repr(self, name: str) -> str:
+    def help_repr(self) -> str:
         qualifiers = ""
         if self.minimum is not None and self.maximum is not None:
-            qualifiers = f" ({self.maximum} > {name} > {self.minimum})"
+            qualifiers = f" ({self.maximum} > val > {self.minimum})"
         elif self.minimum is not None:
-            qualifiers = f" ({name} > {self.minimum})"
+            qualifiers = f" (val > {self.minimum})"
         elif self.minimum is not None:
-            qualifiers = f" ({self.maximum} > {name})"
-        return f"<{name}:int{qualifiers}>"
+            qualifiers = f" ({self.maximum} > val)"
+        return f"int{qualifiers}"
 
     def global_help_repr(self, name: str) -> str:
         return f"{name}:int"
@@ -128,17 +128,15 @@ class StringType(BaseArgType):
             return None
         return parsed_value
 
-    def help_repr(self, name: str) -> str:
+    def help_repr(self) -> str:
         qualifiers = ""
         if self.minimum_length is not None and self.maximum_length is not None:
-            qualifiers = (
-                f" ({self.maximum_length} > length:{name} > {self.minimum_length})"
-            )
+            qualifiers = f" ({self.maximum_length} > length > {self.minimum_length})"
         elif self.minimum_length is not None:
-            qualifiers = f" (length:{name} > {self.minimum_length})"
+            qualifiers = f" (length > {self.minimum_length})"
         elif self.minimum_length is not None:
-            qualifiers = f" ({self.maximum_length} > length:{name})"
-        return f"<{name}:string{qualifiers}>"
+            qualifiers = f" ({self.maximum_length} > length)"
+        return f"string{qualifiers}"
 
     def global_help_repr(self, name: str) -> str:
         return f"{name}:text"
@@ -162,8 +160,8 @@ class EnumType(BaseArgType):
             return None
         return value
 
-    def help_repr(self, name: str) -> str:
-        return f"<{name}:enum ({'|'.join(self.values)})>"
+    def help_repr(self) -> str:
+        return f"enum ({'|'.join(self.values)})"
 
     def global_help_repr(self, name: str) -> str:
         return f"{name}:{'|'.join(self.values)}"
@@ -185,8 +183,8 @@ class UnknownLengthListType(BaseArgType):
             return None
         return l
 
-    def help_repr(self, name: str) -> str:
-        return f"{self.arg_type.help_repr(name)} [...]"
+    def help_repr(self) -> str:
+        return f"{self.arg_type.help_repr()} [...]"
 
     def global_help_repr(self, name: str) -> str:
         return f"{self.arg_type.global_help_repr(name)} [...]"
@@ -197,9 +195,6 @@ class FlagType:
 
     def __init__(self, help: Optional[str] = None):
         self.help = help
-
-    def help_repr(self, name: str) -> str:
-        return f"[--{name}]"
 
     def global_help_repr(self, name: str) -> str:
         return f"[--{name}]"

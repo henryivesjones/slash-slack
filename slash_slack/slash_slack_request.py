@@ -2,6 +2,10 @@ from pydantic import BaseModel
 
 
 class SlashSlackRequest(BaseModel):
+    """
+    The parsed request from the slash command.
+    """
+
     token: str
     team_id: str
     team_domain: str

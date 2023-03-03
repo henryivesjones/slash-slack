@@ -12,8 +12,14 @@ from slash_slack.arg_types import (
 from slash_slack.blocks import _make_block_message
 from slash_slack.slash_slack_request import SlashSlackRequest
 
+_NL = "\n"
+
 
 class SlashSlackCommand:
+    """
+    Abstraction for running command functions. Input parsing, command execution, and command help live here.
+    """
+
     command: str
     help: Optional[str] = None
     summary: Optional[str] = None
@@ -41,6 +47,9 @@ class SlashSlackCommand:
         self.summary = summary
 
     def parse_args(self, args: str):
+        """
+        Parse input text for this command utilizing this commands flag and arg schema.
+        """
         if len(self.args_type) == 1 and isinstance(self.args_type[0][1], StringType):
             p = self.args_type[0][1].parse(args)
             if p is None:
@@ -69,6 +78,9 @@ class SlashSlackCommand:
         global_flags: Set[str],
         slash_slack_request: SlashSlackRequest,
     ):
+        """
+        Executes this command given already parsed args, flags, and global_flags.
+        """
         f_args: List[Any] = [None for _ in range(self.func.__code__.co_argcount)]
         if self.request_arg is not None:
             _, i = self.request_arg
@@ -94,3 +106,46 @@ class SlashSlackCommand:
                     logging.error(
                         f"Received an error when sending request to callback ({resp.status}): {await resp.text()}"
                     )
+
+    def _help(
+        self, slash_slack_request: SlashSlackRequest, visible_in_channel: bool = False
+    ):
+        """
+        Generates the help text response for this command. Returns Slack Block Kit.
+        """
+        lines = []
+        lines.append(
+            f"`{slash_slack_request.command}` `{self.command}` help.\n"
+            f" To view this message run `{slash_slack_request.command} {self.command} --help`"
+        )
+        lines.append("")
+        if self.summary is not None:
+            lines[-1] += f"\n*{self.summary}*"
+        if self.help is not None:
+            lines[-1] += f"\n> {self.help}"
+
+        command_descriptors = []
+        command_descriptors.append(f"`{slash_slack_request.command}` `{self.command}`")
+        for arg_name, arg_type, _ in self.args_type:
+            command_descriptors.append(f" `{arg_type.global_help_repr(arg_name)}`")
+        for flag_name, flag_type, _ in self.flags:
+            command_descriptors.append(f"`{flag_type.global_help_repr(flag_name)}`")
+        lines[-1] += "\n" + " ".join(command_descriptors)
+        lines.append("Parameters:")
+
+        arg_descriptors = []
+        for name, arg, index in self.args_type:
+            arg_descriptors.append(
+                f"{f'> {arg.help}{_NL}' if arg.help else ''}> `{name}`   `{arg.help_repr()}`"
+            )
+        lines += arg_descriptors
+
+        if len(self.flags) > 0:
+            flag_descriptors = []
+            for name, flag, index in self.flags:
+                flag_descriptors.append(
+                    f"> `--{name}` {f'{flag.help}' if flag.help else ''}"
+                )
+            lines.append(f"Flags:{_NL}{_NL.join(flag_descriptors)}")
+
+        return _make_block_message(lines, visible_in_channel=visible_in_channel)
