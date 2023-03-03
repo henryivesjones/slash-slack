@@ -213,22 +213,22 @@ def unknown(
 ```
 /slash-slack help
 ```
-![Global Help Example](static/global_help.png?raw=true)
+![Global Help Example](https://github.com/henryivesjones/slash-slack/blob/main/static/global_help.png?raw=true)
 
 ## Command Help
 ```
 /slash-slack math --help
 ```
-![Math Command Help Example](static/math_command_help.png?raw=true)
+![Math Command Help Example](https://github.com/henryivesjones/slash-slack/blob/main/static/math_command_help.png?raw=true)
 
 ## Command invocation
 ```
 /slash-slack math 10 * 20
 ```
-![Math Command Usage Example](static/math_command_usage.png?raw=true)
+![Math Command Usage Example](https://github.com/henryivesjones/slash-slack/blob/main/static/math_command_usage.png?raw=true)
 
 ## Command parsing error
 ```
 /slash-slack math a * 100
 ```
-![Math Command Parse Error Example](static/math_command_parse_error.png?raw=true)
+![Math Command Parse Error Example](https://github.com/henryivesjones/slash-slack/blob/main/static/math_command_parse_error.png?raw=true)
