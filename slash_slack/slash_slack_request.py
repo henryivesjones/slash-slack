@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -9,8 +11,8 @@ class SlashSlackRequest(BaseModel):
     token: str
     team_id: str
     team_domain: str
-    enterprise_id: str
-    enterprise_name: str
+    enterprise_id: Optional[str] = None
+    enterprise_name: Optional[str] = None
     channel_id: str
     channel_name: str
     user_id: str
