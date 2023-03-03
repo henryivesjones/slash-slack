@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from slash_slack.arg_types import (
     BaseArgType,
+    EnumType,
     FlagType,
     FloatType,
     IntType,
@@ -24,6 +25,7 @@ from slash_slack.slash_slack_request import SlashSlackRequest
 class SlashSlack:
     global_flags = {"visible"}
     url_path: str
+    description: str
     app: FastAPI
     commands: Dict[str, SlashSlackCommand]
     dev: bool
@@ -34,8 +36,10 @@ class SlashSlack:
         dev: bool = False,
         signing_secret: Optional[str] = None,
         url_path="/slash_slack",
+        description="",
     ):
         self.url_path = url_path
+        self.description = description
         self.app = FastAPI(title="SlashSlack", openapi_url=None)
         self.commands = {}
         self.dev = dev
@@ -68,17 +72,19 @@ class SlashSlack:
             if request_form_data.get("ssl_check") == 1:
                 return Response(status_code=200)
             try:
-                slack_slash_request = SlashSlackRequest(**request_form_data)
+                slash_slack_request = SlashSlackRequest(**request_form_data)
             except ValidationError:
                 raise HTTPException(
                     status_code=422, detail="Validation of request body failed."
                 )
 
-            command, args, flags = _parse_command_text(slack_slash_request.text.strip())
+            command, args, flags = _parse_command_text(slash_slack_request.text.strip())
+            if command.lower() == "help":
+                return self._global_help(slash_slack_request)
 
             if command not in self.commands:
                 return _make_block_message(
-                    _command_not_found(slack_slash_request), visible_in_channel=False
+                    _command_not_found(slash_slack_request), visible_in_channel=False
                 )
             parsed_args = self.commands[command].parse_args(args)
             if parsed_args is None:
@@ -90,7 +96,7 @@ class SlashSlack:
                 parsed_args,
                 flags.difference(self.global_flags),
                 global_flags,
-                slack_slash_request,
+                slash_slack_request,
             )
 
             return Response(status_code=200)
@@ -98,7 +104,9 @@ class SlashSlack:
     def get_fastapi(self):
         return self.app
 
-    def command(self, command: str, help: Optional[str] = None):
+    def command(
+        self, command: str, help: Optional[str] = None, summary: Optional[str] = None
+    ):
         """
         Decorator for defining a command.
         """
@@ -114,10 +122,39 @@ class SlashSlack:
                 args_type=params,
                 request_arg=request_arg,
                 help=help,
+                summary=summary,
             )
             return func
 
         return decorator_command
+
+    def _global_help(self, slash_slack_request: SlashSlackRequest):
+        lines = []
+        lines.append(
+            f"`{slash_slack_request.command}` help.\nTo view this message run `{slash_slack_request.command} help`"
+        )
+        lines.append(
+            f"> By default bot replies are only visible by the requestor. To make the reply visible to everyone in the channel use the `--visible` flag."
+        )
+        lines.append(
+            f"> To view help for a specific command use the `--help` flag\n> EX: `{slash_slack_request.command} <command> --help`\n"
+            "*Available Commands:*"
+        )
+        if self.description != "":
+            lines.append(self.description)
+        for command_text, command in self.commands.items():
+            command_descriptor = f">"
+            if command.summary is not None:
+                command_descriptor += f" {command.summary}\n>"
+            command_descriptor += f" `{slash_slack_request.command}` `{command_text}`"
+            for arg_name, arg_type, _ in command.args_type:
+                command_descriptor += " `" + arg_type.global_help_repr(arg_name) + "`"
+            for flag_name, flag_type, _ in command.flags:
+                command_descriptor += " `" + flag_type.global_help_repr(flag_name) + "`"
+
+            command_descriptor += "\n"
+            lines.append(command_descriptor)
+        return _make_block_message(lines)
 
 
 _FLAG_REGEXP = re.compile(r"""(?:^|(?<= ))--(?P<flag>\S+?)(?:$| )""")
@@ -199,5 +236,5 @@ def _parse_func_params(func: Callable):
 def _command_not_found(slack_slash_request: SlashSlackRequest) -> str:
     return f"""
 The command `{slack_slash_request.command} {slack_slash_request.text}` did not match any commands I know. Please try again.
-To view help run the command `{slack_slash_request.command} --help`
+To view help run the command `{slack_slash_request.command} help`
     """.strip()

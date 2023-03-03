@@ -16,6 +16,7 @@ from slash_slack.slash_slack_request import SlashSlackRequest
 class SlashSlackCommand:
     command: str
     help: Optional[str] = None
+    summary: Optional[str] = None
     func: Callable
     flags: List[Tuple[str, FlagType, int]]
     args_type: List[Tuple[str, BaseArgType, int]]
@@ -29,6 +30,7 @@ class SlashSlackCommand:
         args_type: List[Tuple[str, BaseArgType, int]],
         request_arg: Optional[Tuple[str, int]],
         help: Optional[str] = None,
+        summary: Optional[str] = None,
     ):
         self.command = command
         self.func = func
@@ -36,6 +38,7 @@ class SlashSlackCommand:
         self.args_type = args_type
         self.request_arg = request_arg
         self.help = help
+        self.summary = summary
 
     def parse_args(self, args: str):
         if len(self.args_type) == 1 and isinstance(self.args_type[0][1], StringType):
@@ -64,12 +67,12 @@ class SlashSlackCommand:
         args: List[str],
         flags: Set[str],
         global_flags: Set[str],
-        slack_slash_request: SlashSlackRequest,
+        slash_slack_request: SlashSlackRequest,
     ):
         f_args: List[Any] = [None for _ in range(self.func.__code__.co_argcount)]
         if self.request_arg is not None:
             _, i = self.request_arg
-            f_args[i] = slack_slash_request
+            f_args[i] = slash_slack_request
 
         for i, value in enumerate(args):
             if isinstance(self.args_type[i][1], UnknownLengthListType):
@@ -82,7 +85,7 @@ class SlashSlackCommand:
         response = self.func(*f_args)
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                slack_slash_request.response_url,
+                slash_slack_request.response_url,
                 json=_make_block_message(
                     response, visible_in_channel="visible" in global_flags
                 ),

@@ -9,6 +9,14 @@ class BaseArgType(ABC):
     def parse(self, value) -> Any:
         pass
 
+    @abstractmethod
+    def help_repr(self, name: str) -> str:
+        pass
+
+    @abstractmethod
+    def global_help_repr(self, name: str) -> str:
+        pass
+
 
 class FloatType(BaseArgType):
     help: Optional[str] = None
@@ -36,6 +44,19 @@ class FloatType(BaseArgType):
             return None
         return parsed_value
 
+    def help_repr(self, name: str) -> str:
+        qualifiers = ""
+        if self.minimum is not None and self.maximum is not None:
+            qualifiers = f" ({self.maximum} > {name} > {self.minimum})"
+        elif self.minimum is not None:
+            qualifiers = f" ({name} > {self.minimum})"
+        elif self.minimum is not None:
+            qualifiers = f" ({self.maximum} > {name})"
+        return f"<{name}:float{qualifiers}>"
+
+    def global_help_repr(self, name: str) -> str:
+        return f"{name}:float"
+
 
 class IntType(BaseArgType):
     help: Optional[str] = None
@@ -62,6 +83,19 @@ class IntType(BaseArgType):
         ):
             return None
         return parsed_value
+
+    def help_repr(self, name: str) -> str:
+        qualifiers = ""
+        if self.minimum is not None and self.maximum is not None:
+            qualifiers = f" ({self.maximum} > {name} > {self.minimum})"
+        elif self.minimum is not None:
+            qualifiers = f" ({name} > {self.minimum})"
+        elif self.minimum is not None:
+            qualifiers = f" ({self.maximum} > {name})"
+        return f"<{name}:int{qualifiers}>"
+
+    def global_help_repr(self, name: str) -> str:
+        return f"{name}:int"
 
 
 class StringType(BaseArgType):
@@ -94,6 +128,21 @@ class StringType(BaseArgType):
             return None
         return parsed_value
 
+    def help_repr(self, name: str) -> str:
+        qualifiers = ""
+        if self.minimum_length is not None and self.maximum_length is not None:
+            qualifiers = (
+                f" ({self.maximum_length} > length:{name} > {self.minimum_length})"
+            )
+        elif self.minimum_length is not None:
+            qualifiers = f" (length:{name} > {self.minimum_length})"
+        elif self.minimum_length is not None:
+            qualifiers = f" ({self.maximum_length} > length:{name})"
+        return f"<{name}:string{qualifiers}>"
+
+    def global_help_repr(self, name: str) -> str:
+        return f"{name}:text"
+
 
 class EnumType(BaseArgType):
     help: Optional[str] = None
@@ -113,6 +162,12 @@ class EnumType(BaseArgType):
             return None
         return value
 
+    def help_repr(self, name: str) -> str:
+        return f"<{name}:enum ({'|'.join(self.values)})>"
+
+    def global_help_repr(self, name: str) -> str:
+        return f"{name}:{'|'.join(self.values)}"
+
 
 class UnknownLengthListType(BaseArgType):
     help: Optional[str] = None
@@ -130,9 +185,21 @@ class UnknownLengthListType(BaseArgType):
             return None
         return l
 
+    def help_repr(self, name: str) -> str:
+        return f"{self.arg_type.help_repr(name)} [...]"
+
+    def global_help_repr(self, name: str) -> str:
+        return f"{self.arg_type.global_help_repr(name)} [...]"
+
 
 class FlagType:
     help: Optional[str] = None
 
     def __init__(self, help: Optional[str] = None):
         self.help = help
+
+    def help_repr(self, name: str) -> str:
+        return f"[--{name}]"
+
+    def global_help_repr(self, name: str) -> str:
+        return f"[--{name}]"

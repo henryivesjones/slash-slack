@@ -14,17 +14,19 @@ slash = SlashSlack(dev=True)
 app = slash.get_fastapi()
 
 
-@slash.command("test")
-def test_fn(text: str = String(minimum_length=10), upper: bool = Flag(), lower=Flag()):
+@slash.command("echo", summary="A test function")
+def test_fn(
+    content: str = String(minimum_length=10), upper: bool = Flag(), lower=Flag()
+):
     if upper:
-        return text.upper()
+        return content.upper()
     if lower:
-        return text.lower()
+        return content.lower()
 
-    return text
+    return content
 
 
-@slash.command("math")
+@slash.command("math", summary="Performs basic arithmetic between two numbers")
 def math_fn(
     x: float = Float(), m: str = Enum(values={"*", "+", "-", "/"}), y: float = Float()
 ):
