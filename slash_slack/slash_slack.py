@@ -16,6 +16,14 @@ from slash_slack.arg_types import (
     UnknownLengthListType,
 )
 from slash_slack.blocks import _make_block_message
+from slash_slack.exceptions import (
+    DuplicateCommandException,
+    InvalidAnnotationException,
+    InvalidDefaultValueException,
+    MultipleSlashSlackRequestParametersException,
+    NoSigningSecretException,
+    ParamAfterUnknownLengthListException,
+)
 from slash_slack.signature_verifier import SignatureVerifier
 from slash_slack.slash_slack_command import SlashSlackCommand
 from slash_slack.slash_slack_request import SlashSlackRequest
@@ -55,7 +63,7 @@ class SlashSlack:
             logging.info("Running in DEV MODE. Signature verification is disabled.")
         else:
             if signing_secret is None:
-                raise Exception(
+                raise NoSigningSecretException(
                     "No signing secret provided. Either disable signature verification by running in dev mode, or provide the signing secret."
                 )
             self.signature_verifier = SignatureVerifier(signing_secret)
@@ -133,7 +141,7 @@ class SlashSlack:
 
     def get_fast_api(self):
         """
-        Get the underlying fast_api app which should be exported to be run by wsgi worker (uvicorn).
+        Get the underlying fast_api app which should be exported to be run by a wsgi worker (uvicorn).
         """
         return self.app
 
@@ -152,7 +160,9 @@ class SlashSlack:
 
         def decorator_command(func: Callable):
             if command in self.commands:
-                raise Exception(f"The command {command} has already been registered.")
+                raise DuplicateCommandException(
+                    f"The command {command} has already been registered."
+                )
             params, flags, request_arg = _parse_func_params(func)
             self.commands[command] = SlashSlackCommand(
                 command=command,
@@ -173,34 +183,30 @@ class SlashSlack:
         """
         Generates the global help for this SlashSlack bot.
         """
-        lines = []
-        lines.append(
-            f"`{slash_slack_request.command}` help.\nTo view this message run `{slash_slack_request.command} help`"
-        )
-        lines.append(
-            f"> By default bot replies are only visible to the requestor. "
-            "To make the reply visible to everyone in the channel use the `--visible` flag anywhere in your command."
-        )
-        lines.append(
-            f"> To view help for a specific command use the `--help` flag\n> EX: `{slash_slack_request.command} <command> --help`"
-        )
-        if self.description != "":
-            lines.append(self.description)
-        lines.append("*Available Commands:*")
-        for command_text, command in self.commands.items():
-            command_descriptors = []
-            if command.summary is not None:
-                command_descriptors.append(f" {command.summary}\n>")
-            command_descriptors.append(
-                f" `{slash_slack_request.command}` `{command_text}`"
-            )
-            for arg_name, arg_type, _ in command.args_type:
-                command_descriptors.append(f" `{arg_type.global_help_repr(arg_name)}`")
-            for flag_name, flag_type, _ in command.flags:
-                command_descriptors.append(f"`{flag_type.global_help_repr(flag_name)}`")
+        _GLOBAL_HELP = f"""
+`{slash_slack_request.command}` help.
+To view this message run `{slash_slack_request.command} help`
+> By default bot replies are only visible to the requestor. To make the reply visible to everyone in the channel use the `--visible` flag anywhere in your command.
 
-            lines.append(f"> {' '.join(command_descriptors)}\n")
-        return _make_block_message(lines, visible_in_channel=visible_in_channel)
+> To view help for a specific command use the `--help` flag
+> EX: `{slash_slack_request.command} <command> --help`
+{self.description if self.description else ""}
+
+*Available Commands:*
+{self._generate_command_signatures(slash_slack_request)}
+        """.strip()
+        return _make_block_message(_GLOBAL_HELP, visible_in_channel=visible_in_channel)
+
+    def _generate_command_signatures(self, slash_slack_request: SlashSlackRequest):
+        signature_help_contents = []
+        for command_text, command in self.commands.items():
+            signature_help_contents.append(
+                f"""
+{f"> {command.summary}" if command.summary else ""}
+> `{slash_slack_request.command}` {command._generate_command_signature()}
+            """.strip()
+            )
+        return "\n\n".join(signature_help_contents)
 
 
 _FLAG_REGEXP = re.compile(r"""(?:^|(?<= ))--(?P<flag>\S+?)(?:$| )""")
@@ -211,7 +217,7 @@ def _parse_command_text(text: str) -> Tuple[str, str, Set[str]]:
     text = _FLAG_REGEXP.sub("", text).strip()
     split_text = text.split(" ")
     command = split_text[0]
-    args = " ".join(split_text[1:])
+    args = " ".join([arg for arg in split_text[1:] if arg != ""])
     return command, args, flags
 
 
@@ -228,7 +234,7 @@ def _parse_func_params(func: Callable):
 
         if annotation is SlashSlackRequest:
             if request_arg is not None:
-                raise Exception(
+                raise MultipleSlashSlackRequestParametersException(
                     f"Function {func.__name__} has a two SlashSlackRequest parameters. This is not allowed."
                 )
             request_arg = (name, index)
@@ -239,7 +245,7 @@ def _parse_func_params(func: Callable):
             continue
 
         if has_encountered_unknown_length_list:
-            raise Exception(
+            raise ParamAfterUnknownLengthListException(
                 f"Function {func.__name__} has a ({type(default)}) param after an UnknownListType param. This is not allowed."
             )
         if default is not None:
@@ -257,7 +263,7 @@ def _parse_func_params(func: Callable):
             if isinstance(default, int):
                 params.append((name, IntType(), index))
                 continue
-            raise Exception(
+            raise InvalidDefaultValueException(
                 f"Function {func.__name__} has an invalid default value of ({type(default)})"
             )
 
@@ -272,7 +278,7 @@ def _parse_func_params(func: Callable):
                 params.append((name, IntType(), index))
                 continue
 
-            raise Exception(
+            raise InvalidAnnotationException(
                 f"Function {func.__name__} has an invalid annotation of ({annotation}) for {name}"
             )
         params.append((name, StringType(), index))

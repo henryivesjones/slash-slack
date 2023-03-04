@@ -1,7 +1,7 @@
 # slash-slack
 A python framework for building slack slash bots. Get input parsing and validation, command routing, async responses, auto-generated help dialog, response visibility, and response message formatting all for free.
 
-`slash-slack` is a web server with a single endpoint (by default `/slash-slack`). In order to connect the Slack Slash command with the `slash-slack` server, the `slash-slack` server must be publicly accessible and the slash command must be configured with Slack. View [Slack slash command documentation](https://api.slack.com/interactivity/slash-commands) here.
+`slash-slack` is a web server with a single endpoint (by default `/slash_slack`). In order to connect the Slack Slash command with the `slash-slack` server, the `slash-slack` server must be publicly accessible and the slash command must be configured with Slack. View [Slack slash command documentation](https://api.slack.com/interactivity/slash-commands) here.
 
 ```python
 # EX: /slash-slack math 10 * 10
