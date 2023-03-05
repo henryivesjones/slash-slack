@@ -56,24 +56,43 @@ class SlashSlackCommand:
                 return None
             return [p]
 
-        split_args = [arg for arg in args.split(" ")]
+        split_args = [arg for arg in args.split(" ") if arg != ""]
 
         l = []
         for i, value in enumerate(split_args):
             if i >= len(self.args_type):
                 return None
             if isinstance(self.args_type[i][1], UnknownLengthListType):
-                l += self.args_type[i][1].parse(split_args[i:])
+                l.append(self.args_type[i][1].parse(split_args[i:]))
                 break
             l.append(self.args_type[i][1].parse(value))
 
+        if len(self.args_type) != len(l):
+            return None
         if None in l:
             return None
         return l
 
+    def _hydrate_func_args(
+        self,
+        args: List[Any],
+        flags: Set[str],
+        slash_slack_request: SlashSlackRequest,
+    ):
+        f_args: List[Any] = [None for _ in range(self.func.__code__.co_argcount)]
+        if self.request_arg is not None:
+            _, i = self.request_arg
+            f_args[i] = slash_slack_request
+
+        for i, value in enumerate(args):
+            f_args[self.args_type[i][2]] = value
+        for name, _, i in self.flags:
+            f_args[i] = name in flags
+        return f_args
+
     async def execute(
         self,
-        args: List[str],
+        args: List[Any],
         flags: Set[str],
         global_flags: Set[str],
         slash_slack_request: SlashSlackRequest,
@@ -81,18 +100,7 @@ class SlashSlackCommand:
         """
         Executes this command given already parsed args, flags, and global_flags.
         """
-        f_args: List[Any] = [None for _ in range(self.func.__code__.co_argcount)]
-        if self.request_arg is not None:
-            _, i = self.request_arg
-            f_args[i] = slash_slack_request
-
-        for i, value in enumerate(args):
-            if isinstance(self.args_type[i][1], UnknownLengthListType):
-                f_args[self.args_type[i][2]] = args[i:]
-                break
-            f_args[self.args_type[i][2]] = value
-        for name, _, i in self.flags:
-            f_args[i] = name in flags
+        f_args = self._hydrate_func_args(args, flags, slash_slack_request)
 
         response = self.func(*f_args)
         async with aiohttp.ClientSession() as session:

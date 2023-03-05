@@ -37,6 +37,7 @@ class SlashSlack:
     global_flags = {"visible", "help"}
     url_path: str
     description: str
+    contact: Optional[str] = None
     app: FastAPI
     commands: Dict[str, SlashSlackCommand]
     dev: bool
@@ -48,6 +49,7 @@ class SlashSlack:
         signing_secret: Optional[str] = None,
         url_path="/slash_slack",
         description="",
+        contact=None,
     ):
         """
         Create a Slash Slack app.
@@ -58,6 +60,7 @@ class SlashSlack:
         self.app = FastAPI(title="SlashSlack", openapi_url=None)
         self.commands = {}
         self.dev = dev
+        self.contact = contact
 
         if self.dev:
             logging.info("Running in DEV MODE. Signature verification is disabled.")
@@ -136,7 +139,7 @@ class SlashSlack:
             except Exception as e:
                 logging.error(e)
                 return _make_block_message(
-                    _unable_to_respond(), visible_in_channel=False
+                    self._unable_to_respond(), visible_in_channel=False
                 )
 
     def get_fast_api(self):
@@ -207,6 +210,12 @@ To view this message run `{slash_slack_request.command} help`
             """.strip()
             )
         return "\n\n".join(signature_help_contents)
+
+    def _unable_to_respond(self):
+        return f"""
+I was unable to respond to your request due to an internal error. Please contact the bot administrator.
+{self.contact if self.contact is not None else ""}
+    """.strip()
 
 
 _FLAG_REGEXP = re.compile(r"""(?:^|(?<= ))--(?P<flag>\S+?)(?:$| )""")
@@ -289,12 +298,6 @@ def _command_not_found(slack_slash_request: SlashSlackRequest) -> str:
     return f"""
 The command `{slack_slash_request.command} {slack_slash_request.text}` did not match any commands I know. Please try again.
 To view help run the command `{slack_slash_request.command} help`
-    """.strip()
-
-
-def _unable_to_respond():
-    return f"""
-I was unable to respond to your request due to an internal error. Please contact the bot administrator.
     """.strip()
 
 
