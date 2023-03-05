@@ -7,4 +7,3 @@ COPY startup.sh startup.sh
 COPY main.py main.py
 
 CMD ["./startup.sh"]
-
