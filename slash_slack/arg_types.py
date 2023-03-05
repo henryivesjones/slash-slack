@@ -38,6 +38,8 @@ class FloatType(BaseArgType):
             parsed_value = float(value)
         except ValueError:
             return None
+        except TypeError:
+            return None
         if (self.maximum is not None and parsed_value > self.maximum) or (
             self.minimum is not None and parsed_value < self.minimum
         ):
@@ -78,6 +80,8 @@ class IntType(BaseArgType):
             parsed_value = int(value)
         except ValueError:
             return None
+        except TypeError:
+            return None
         if (self.maximum is not None and parsed_value > self.maximum) or (
             self.minimum is not None and parsed_value < self.minimum
         ):
@@ -116,9 +120,13 @@ class StringType(BaseArgType):
         self.maximum_length = maximum_length
 
     def parse(self, value):
+        if value is None:
+            return None
         try:
             parsed_value = str(value)
         except ValueError:
+            return None
+        except TypeError:
             return None
         if (
             self.maximum_length is not None and len(parsed_value) > self.maximum_length
@@ -177,6 +185,8 @@ class UnknownLengthListType(BaseArgType):
 
     def parse(self, value):
         l = []
+        if isinstance(value, str):
+            value = [a for a in value.split(" ") if a != ""]
         for arg in value:
             l.append(self.arg_type.parse(arg))
         if None in l:

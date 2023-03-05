@@ -63,17 +63,36 @@ class SlashSlackCommand:
             if i >= len(self.args_type):
                 return None
             if isinstance(self.args_type[i][1], UnknownLengthListType):
-                l += self.args_type[i][1].parse(split_args[i:])
+                l.append(self.args_type[i][1].parse(split_args[i:]))
                 break
             l.append(self.args_type[i][1].parse(value))
 
+        if len(self.args_type) != len(l):
+            return None
         if None in l:
             return None
         return l
 
+    def _hydrate_func_args(
+        self,
+        args: List[Any],
+        flags: Set[str],
+        slash_slack_request: SlashSlackRequest,
+    ):
+        f_args: List[Any] = [None for _ in range(self.func.__code__.co_argcount)]
+        if self.request_arg is not None:
+            _, i = self.request_arg
+            f_args[i] = slash_slack_request
+
+        for i, value in enumerate(args):
+            f_args[self.args_type[i][2]] = value
+        for name, _, i in self.flags:
+            f_args[i] = name in flags
+        return f_args
+
     async def execute(
         self,
-        args: List[str],
+        args: List[Any],
         flags: Set[str],
         global_flags: Set[str],
         slash_slack_request: SlashSlackRequest,
@@ -81,18 +100,7 @@ class SlashSlackCommand:
         """
         Executes this command given already parsed args, flags, and global_flags.
         """
-        f_args: List[Any] = [None for _ in range(self.func.__code__.co_argcount)]
-        if self.request_arg is not None:
-            _, i = self.request_arg
-            f_args[i] = slash_slack_request
-
-        for i, value in enumerate(args):
-            if isinstance(self.args_type[i][1], UnknownLengthListType):
-                f_args[self.args_type[i][2]] = args[i:]
-                break
-            f_args[self.args_type[i][2]] = value
-        for name, _, i in self.flags:
-            f_args[i] = name in flags
+        f_args = self._hydrate_func_args(args, flags, slash_slack_request)
 
         response = self.func(*f_args)
         async with aiohttp.ClientSession() as session:
@@ -113,39 +121,46 @@ class SlashSlackCommand:
         """
         Generates the help text response for this command. Returns Slack Block Kit.
         """
-        lines = []
-        lines.append(
-            f"`{slash_slack_request.command}` `{self.command}` help.\n"
-            f" To view this message run `{slash_slack_request.command} {self.command} --help`"
+        _HELP = f"""
+`{slash_slack_request.command}` `{self.command}` help.
+To view this message run `{slash_slack_request.command} {self.command} --help`
+{f"*{self.summary}*" if self.summary else ""}
+{f"> {self.help}" if self.help else ""}
+`{slash_slack_request.command}` {self._generate_command_signature()}
+Parameters:
+{self._generate_parameter_help()}
+{"Flags:" if len(self.flags) > 0 else ""}
+{self._generate_flag_help()}
+        """.strip()
+
+        return _make_block_message(
+            _HELP,
+            visible_in_channel=visible_in_channel,
         )
-        lines.append("")
-        if self.summary is not None:
-            lines[-1] += f"\n*{self.summary}*"
-        if self.help is not None:
-            lines[-1] += f"\n> {self.help}"
 
-        command_descriptors = []
-        command_descriptors.append(f"`{slash_slack_request.command}` `{self.command}`")
-        for arg_name, arg_type, _ in self.args_type:
-            command_descriptors.append(f" `{arg_type.global_help_repr(arg_name)}`")
-        for flag_name, flag_type, _ in self.flags:
-            command_descriptors.append(f"`{flag_type.global_help_repr(flag_name)}`")
-        lines[-1] += "\n" + " ".join(command_descriptors)
-        lines.append("Parameters:")
+    def _generate_command_signature(self) -> str:
+        return f"""
+`{self.command}` {" ".join(f"`{t.global_help_repr(name)}`" for name, t, _ in self.args_type + self.flags)}
+        """.strip()
 
-        arg_descriptors = []
+    def _generate_parameter_help(self) -> str:
+        parameter_help_contents = []
         for name, arg, index in self.args_type:
-            arg_descriptors.append(
-                f"{f'> {arg.help}{_NL}' if arg.help else ''}> `{name}`   `{arg.help_repr()}`"
+            parameter_help_contents.append(
+                f"""
+{f"> {arg.help}" if arg.help else ""}
+> `{name}`   `{arg.help_repr()}`
+            """.strip()
             )
-        lines += arg_descriptors
+        return (_NL * 2).join(parameter_help_contents)
 
-        if len(self.flags) > 0:
-            flag_descriptors = []
-            for name, flag, index in self.flags:
-                flag_descriptors.append(
-                    f"> `--{name}` {f'{flag.help}' if flag.help else ''}"
-                )
-            lines.append(f"Flags:{_NL}{_NL.join(flag_descriptors)}")
+    def _generate_flag_help(self) -> str:
+        flag_help_contents = []
+        for name, flag, index in self.flags:
+            flag_help_contents.append(
+                f"""
+> `--{name}` {flag.help if flag.help else ''}
+            """.strip()
+            )
 
-        return _make_block_message(lines, visible_in_channel=visible_in_channel)
+        return _NL.join(flag_help_contents)

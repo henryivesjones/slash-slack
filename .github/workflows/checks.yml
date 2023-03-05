@@ -21,3 +21,18 @@ jobs:
           pip install black==23.1.0
           black . --check
         working-directory: slash_slack
+
+  unit-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+          architecture: "x64"
+
+      - name: Python Unit Test
+        run: |
+          bash scripts/runUnitTests.sh
+        working-directory: .
