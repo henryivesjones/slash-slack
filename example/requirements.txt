@@ -1,0 +1,4 @@
+slash-slack==0.1.4
+requests==2.28.2
+uvicorn==0.20.0
+
