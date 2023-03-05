@@ -30,6 +30,8 @@ def math_fn(
         return x / y
 ```
 
+View a tutorial of creating a Slack slash command bot with `slash-slack` [here](https://github.com/henryivesjones/slash-slack/blob/main/how_to/how_to_create_slash_slack_bot_python.md).
+
 # Why use `slash-slack`?
 Building a slack slash bot can seem very straightforward at first, however there are some complexities that make it difficult. `slash-slack` handles all of the complexities for you letting you focus on the bot response handlers.
 
