@@ -167,6 +167,7 @@ class SlashSlack:
                     f"The command {command} has already been registered."
                 )
             params, flags, request_arg = _parse_func_params(func)
+            is_async = inspect.iscoroutinefunction(func)
             self.commands[command] = SlashSlackCommand(
                 command=command,
                 func=func,
@@ -175,6 +176,7 @@ class SlashSlack:
                 request_arg=request_arg,
                 help=help,
                 summary=summary,
+                is_async=is_async,
             )
             return func
 

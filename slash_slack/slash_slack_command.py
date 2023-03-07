@@ -27,6 +27,7 @@ class SlashSlackCommand:
     flags: List[Tuple[str, FlagType, int]]
     args_type: List[Tuple[str, BaseArgType, int]]
     request_arg: Optional[Tuple[str, int]] = None
+    is_async: bool
 
     def __init__(
         self,
@@ -37,6 +38,7 @@ class SlashSlackCommand:
         request_arg: Optional[Tuple[str, int]],
         help: Optional[str] = None,
         summary: Optional[str] = None,
+        is_async: bool = False,
     ):
         self.command = command
         self.func = func
@@ -45,6 +47,7 @@ class SlashSlackCommand:
         self.request_arg = request_arg
         self.help = help
         self.summary = summary
+        self.is_async = is_async
 
     def parse_args(self, args: str):
         """
@@ -101,8 +104,10 @@ class SlashSlackCommand:
         Executes this command given already parsed args, flags, and global_flags.
         """
         f_args = self._hydrate_func_args(args, flags, slash_slack_request)
-
-        response = self.func(*f_args)
+        if self.is_async:
+            response = await self.func(*f_args)
+        else:
+            response = self.func(*f_args)
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 slash_slack_request.response_url,
