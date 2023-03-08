@@ -1,7 +1,7 @@
 import inspect
 import logging
 import re
-from typing import Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Set, Tuple, Union
 from urllib.parse import parse_qsl
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
@@ -151,7 +151,10 @@ class SlashSlack:
         """
         return self.app
 
-    def add_before_request_function(self, func: Callable[[SlashSlackRequest], None]):
+    def add_before_request_function(
+        self,
+        func: Callable[[SlashSlackRequest], Union[None, Coroutine[Any, Any, None]]],
+    ):
         """
         Register a function that will be called for every valid request.
 
