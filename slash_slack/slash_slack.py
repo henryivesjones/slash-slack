@@ -42,6 +42,7 @@ class SlashSlack:
     commands: Dict[str, SlashSlackCommand]
     dev: bool
     signature_verifier: SignatureVerifier
+    before_request_functions: List[Callable]
 
     def __init__(
         self,
@@ -61,6 +62,7 @@ class SlashSlack:
         self.commands = {}
         self.dev = dev
         self.contact = contact
+        self.before_request_functions = []
 
         if self.dev:
             logging.info("Running in DEV MODE. Signature verification is disabled.")
@@ -98,7 +100,8 @@ class SlashSlack:
                     raise HTTPException(
                         status_code=422, detail="Validation of request body failed."
                     )
-
+                for fn in self.before_request_functions:
+                    background_tasks.add_task(fn, slash_slack_request)
                 command, args, flags = _parse_command_text(
                     slash_slack_request.text.strip()
                 )
@@ -147,6 +150,15 @@ class SlashSlack:
         Get the underlying fast_api app which should be exported to be run by a wsgi worker (uvicorn).
         """
         return self.app
+
+    def add_before_request_function(self, func: Callable[[SlashSlackRequest], None]):
+        """
+        Register a function that will be called for every valid request.
+
+        This function should take one argument of the type `SlashSlackRequest` and return None.
+
+        """
+        self.before_request_functions.append(func)
 
     def command(
         self, command: str, help: Optional[str] = None, summary: Optional[str] = None
