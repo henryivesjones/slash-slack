@@ -45,6 +45,13 @@ Often times the action being taken by the bot will depend on external services w
 
 `slash-slack` sends an immediate `200` response to the webhook request, and runs the command function in the background. When the command function finishes, the response is sent back to slack using the `response_url` from the request.
 
+You can optionally add content to the immediate response to let your user know that something is being
+done in the background. A global/default response can be set with the `acknowledge_response` parameter on
+the `SlashSlack` class, or at the command level with the `acknowledge_response` parameter on the `command` decorator.
+The value passed to `acknowledge_response` will be passed to `blocks._make_block_message` and can be a `str`, `block`, `list[str]`, or `list[block]`
+where a `block` is a [block kit block](https://api.slack.com/block-kit/building#getting_started).
+See the [example](https://github.com/henryivesjones/slash-slack/blob/main/example.py) for example usage.
+
 ## Input Arg/Flag parsing
 `slash-slack` takes care of parsing command input into pre-defined args and flags which let you focus on writing the command function, and not wrangling the content into the format that you need.
 

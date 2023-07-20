@@ -32,6 +32,7 @@ def test_fn(
 @slash.command(
     "math",
     summary="Performs basic arithmetic between two numbers",
+    acknowledge_response="Responding to a math request...",
 )
 def math_fn(
     x: float = Float(help="A number."),

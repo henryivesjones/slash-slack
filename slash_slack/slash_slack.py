@@ -4,7 +4,7 @@ import re
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Set, Tuple, Union
 from urllib.parse import parse_qsl
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
@@ -46,7 +46,7 @@ class SlashSlack:
     dev: bool
     signature_verifier: SignatureVerifier
     before_request_functions: List[Callable]
-    acknowledge_response: Optional[dict]
+    acknowledge_response: Optional[dict] = None
 
     def __init__(
         self,
@@ -70,7 +70,11 @@ class SlashSlack:
         self.commands = {}
         self.dev = dev
         self.contact = contact
-        self.acknowledge_response = _make_block_message(acknowledge_response)
+        if acknowledge_response is not None:
+            self.acknowledge_response = _make_block_message(
+                acknowledge_response, visible_in_channel=False
+            )
+
         self.before_request_functions = []
 
         if self.dev:
@@ -101,7 +105,7 @@ class SlashSlack:
             try:
                 request_form_data = dict(parse_qsl(request_body.decode()))
                 if request_form_data.get("ssl_check") == 1:
-                    return self.make_success_acknowledge_response()
+                    return Response(status_code=200)
                 try:
                     slash_slack_request = SlashSlackRequest(**request_form_data)
                 except ValidationError as e:
@@ -147,17 +151,22 @@ class SlashSlack:
                     slash_slack_request,
                 )
 
-                return self.make_success_acknowledge_response()
+                return self.make_success_acknowledge_response(command)
             except Exception as e:
                 logger.error(e)
                 return _make_block_message(
                     self._unable_to_respond(), visible_in_channel=False
                 )
 
-    def make_success_acknowledge_response(self):
+    def make_success_acknowledge_response(self, command: str):
         kwargs: dict = {"status_code": 200}
         if self.acknowledge_response is not None:
             kwargs["content"] = self.acknowledge_response
+        if (
+            command in self.commands
+            and self.commands[command].acknowledge_response is not None
+        ):
+            kwargs["content"] = self.commands[command].acknowledge_response
         return JSONResponse(**kwargs)
 
     def get_fast_api(self):
@@ -179,7 +188,11 @@ class SlashSlack:
         self.before_request_functions.append(func)
 
     def command(
-        self, command: str, help: Optional[str] = None, summary: Optional[str] = None
+        self,
+        command: str,
+        help: Optional[str] = None,
+        summary: Optional[str] = None,
+        acknowledge_response: Union[None, str, dict] = None,
     ):
         """
         Decorator for defining a command within a SlashSlack app.
@@ -207,6 +220,7 @@ class SlashSlack:
                 help=help,
                 summary=summary,
                 is_async=is_async,
+                acknowledge_response=acknowledge_response,
             )
             return func
 

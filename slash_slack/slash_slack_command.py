@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, List, Optional, Set, Tuple
+from typing import Any, Callable, List, Optional, Set, Tuple, Union
 
 import aiohttp
 
@@ -30,6 +30,7 @@ class SlashSlackCommand:
     args_type: List[Tuple[str, BaseArgType, int]]
     request_arg: Optional[Tuple[str, int]] = None
     is_async: bool
+    acknowledge_response: Optional[dict] = None
 
     def __init__(
         self,
@@ -41,6 +42,7 @@ class SlashSlackCommand:
         help: Optional[str] = None,
         summary: Optional[str] = None,
         is_async: bool = False,
+        acknowledge_response: Union[None, str, dict] = None,
     ):
         self.command = command
         self.func = func
@@ -50,6 +52,10 @@ class SlashSlackCommand:
         self.help = help
         self.summary = summary
         self.is_async = is_async
+        if acknowledge_response is not None:
+            self.acknowledge_response = _make_block_message(
+                acknowledge_response, visible_in_channel=False
+            )
 
     def parse_args(self, args: str):
         """
