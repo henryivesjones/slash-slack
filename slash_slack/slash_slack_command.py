@@ -14,6 +14,8 @@ from slash_slack.slash_slack_request import SlashSlackRequest
 
 _NL = "\n"
 
+logger = logging.getLogger("slash_slack")
+
 
 class SlashSlackCommand:
     """
@@ -116,7 +118,7 @@ class SlashSlackCommand:
                 ),
             ) as resp:
                 if resp.status != 200:
-                    logging.error(
+                    logger.error(
                         f"Received an error when sending request to callback ({resp.status}): {await resp.text()}"
                     )
 

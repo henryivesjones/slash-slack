@@ -4,7 +4,8 @@ import re
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Set, Tuple, Union
 from urllib.parse import parse_qsl
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, Response
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from slash_slack.arg_types import (
@@ -28,6 +29,8 @@ from slash_slack.signature_verifier import SignatureVerifier
 from slash_slack.slash_slack_command import SlashSlackCommand
 from slash_slack.slash_slack_request import SlashSlackRequest
 
+logger = logging.getLogger("slash_slack")
+
 
 class SlashSlack:
     """
@@ -43,18 +46,23 @@ class SlashSlack:
     dev: bool
     signature_verifier: SignatureVerifier
     before_request_functions: List[Callable]
+    acknowledge_response: Optional[dict]
 
     def __init__(
         self,
         dev: bool = False,
         signing_secret: Optional[str] = None,
-        url_path="/slash_slack",
-        description="",
-        contact=None,
+        url_path: str = "/slash_slack",
+        description: str = "",
+        contact: Optional[str] = None,
+        acknowledge_response: Union[None, str, dict] = None,
     ):
         """
         Create a Slash Slack app.
         To disable signature verification set dev=True
+
+        To respond to the initial request with a non-blank response pass in a value for `acknowledge_response`
+        The value will be passed into `blocks._make_block_message` and should be formatted as such.
         """
         self.url_path = url_path
         self.description = description
@@ -62,10 +70,11 @@ class SlashSlack:
         self.commands = {}
         self.dev = dev
         self.contact = contact
+        self.acknowledge_response = _make_block_message(acknowledge_response)
         self.before_request_functions = []
 
         if self.dev:
-            logging.info("Running in DEV MODE. Signature verification is disabled.")
+            logger.info("Running in DEV MODE. Signature verification is disabled.")
         else:
             if signing_secret is None:
                 raise NoSigningSecretException(
@@ -92,11 +101,11 @@ class SlashSlack:
             try:
                 request_form_data = dict(parse_qsl(request_body.decode()))
                 if request_form_data.get("ssl_check") == 1:
-                    return Response(status_code=200)
+                    return self.make_success_acknowledge_response()
                 try:
                     slash_slack_request = SlashSlackRequest(**request_form_data)
                 except ValidationError as e:
-                    logging.error(e)
+                    logger.error(e)
                     raise HTTPException(
                         status_code=422, detail="Validation of request body failed."
                     )
@@ -138,12 +147,18 @@ class SlashSlack:
                     slash_slack_request,
                 )
 
-                return Response(status_code=200)
+                return self.make_success_acknowledge_response()
             except Exception as e:
-                logging.error(e)
+                logger.error(e)
                 return _make_block_message(
                     self._unable_to_respond(), visible_in_channel=False
                 )
+
+    def make_success_acknowledge_response(self):
+        kwargs: dict = {"status_code": 200}
+        if self.acknowledge_response is not None:
+            kwargs["content"] = self.acknowledge_response
+        return JSONResponse(**kwargs)
 
     def get_fast_api(self):
         """

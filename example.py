@@ -3,7 +3,11 @@ from typing import List
 from slash_slack import Enum, Flag, Float, SlashSlack, String, UnknownLengthList
 from slash_slack.blocks import _make_block_message
 
-slash = SlashSlack(dev=True, description="A python framework for slack slash bots.")
+slash = SlashSlack(
+    dev=True,
+    description="A python framework for slack slash bots.",
+    acknowledge_response="Working on your request...",
+)
 app = slash.get_fast_api()
 
 
