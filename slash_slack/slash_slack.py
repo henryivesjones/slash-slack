@@ -167,6 +167,9 @@ class SlashSlack:
             and self.commands[command].acknowledge_response is not None
         ):
             kwargs["content"] = self.commands[command].acknowledge_response
+
+        if "content" not in kwargs:
+            return Response(status_code=201)
         return JSONResponse(**kwargs)
 
     def get_fast_api(self):
